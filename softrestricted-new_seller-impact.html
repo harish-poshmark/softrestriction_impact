@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seller Moderation Analysis — Poshmark</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --ink: #0f0f0f;
+    --ink-2: #3a3a3a;
+    --ink-3: #717171;
+    --ink-4: #aaaaaa;
+    --paper: #faf9f6;
+    --paper-2: #f2f0eb;
+    --paper-3: #e8e4dc;
+    --line: #ddd9d0;
+    --accent: #c8401a;
+    --accent-light: #f5ebe6;
+    --accent-2: #1a5c8a;
+    --accent-2-light: #e6f0f7;
+    --green: #1a6b3a;
+    --green-light: #e6f4ec;
+    --amber: #8a5a0d;
+    --amber-light: #faf0d8;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── NAV ── */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+    padding: 0 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 52px;
+  }
+  .nav-brand {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  .nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+  }
+  .nav-links a {
+    font-size: 12px;
+    text-decoration: none;
+    color: var(--ink-3);
+    letter-spacing: .03em;
+    transition: color .15s;
+  }
+  .nav-links a:hover { color: var(--ink); }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 5rem 3rem 4rem;
+    max-width: 900px;
+    margin: 0 auto;
+    border-bottom: 1px solid var(--line);
+  }
+  .hero-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+  }
+  .hero h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(2rem, 4vw, 3rem);
+    line-height: 1.15;
+    color: var(--ink);
+    margin-bottom: 1.5rem;
+    max-width: 700px;
+  }
+  .hero h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+  .hero-sub {
+    font-size: 16px;
+    color: var(--ink-2);
+    max-width: 580px;
+    line-height: 1.7;
+    margin-bottom: 2.5rem;
+  }
+  .hero-meta {
+    display: flex;
+    gap: 2.5rem;
+    flex-wrap: wrap;
+  }
+  .hero-meta-item {
+    font-size: 12px;
+    color: var(--ink-4);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .04em;
+  }
+  .hero-meta-item strong {
+    display: block;
+    font-size: 20px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--ink);
+    letter-spacing: 0;
+    line-height: 1.2;
+  }
+
+  /* ── SECTION WRAPPER ── */
+  .section {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 4rem 3rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .section:last-child { border-bottom: none; }
+
+  .section-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin-bottom: .6rem;
+  }
+  .section-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(1.3rem, 2.5vw, 1.75rem);
+    line-height: 1.25;
+    margin-bottom: 1rem;
+    max-width: 680px;
+  }
+  .section-body {
+    font-size: 14.5px;
+    color: var(--ink-2);
+    line-height: 1.75;
+    max-width: 640px;
+    margin-bottom: 2rem;
+  }
+  .section-body strong { color: var(--ink); font-weight: 500; }
+
+  /* ── STAT STRIP ── */
+  .stat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 2.5rem;
+  }
+  .stat-cell {
+    background: var(--paper);
+    padding: 1.25rem 1.5rem;
+  }
+  .stat-val {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.4rem;
+    line-height: 1;
+    margin-bottom: .35rem;
+  }
+  .stat-val.red { color: var(--accent); }
+  .stat-val.green { color: var(--green); }
+  .stat-val.blue { color: var(--accent-2); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-lbl { font-size: 12px; color: var(--ink-3); line-height: 1.4; }
+
+  /* ── FUNNEL ── */
+  .funnel {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin: 2rem 0;
+  }
+  .funnel-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .funnel-bar-wrap {
+    flex: 1;
+    height: 40px;
+    background: var(--paper-2);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+  .funnel-bar {
+    height: 100%;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    padding-left: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: white;
+    white-space: nowrap;
+    transition: width 1.2s cubic-bezier(.4,0,.2,1);
+  }
+  .funnel-label {
+    font-size: 12px;
+    color: var(--ink-3);
+    width: 220px;
+    flex-shrink: 0;
+    text-align: right;
+  }
+  .funnel-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    font-weight: 500;
+    width: 48px;
+    flex-shrink: 0;
+    color: var(--ink-2);
+  }
+
+  /* ── CHART CONTAINERS ── */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin: 2rem 0;
+  }
+  @media (max-width: 640px) { .chart-grid { grid-template-columns: 1fr; } }
+
+  .chart-card {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1.5rem;
+  }
+  .chart-card-full {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+  }
+  .chart-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    font-family: 'DM Mono', monospace;
+    margin-bottom: 1rem;
+  }
+  .chart-wrap {
+    position: relative;
+    height: 240px;
+  }
+  .chart-wrap-tall {
+    position: relative;
+    height: 300px;
+  }
+
+  /* ── TABLE ── */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    margin: 1.5rem 0;
+  }
+  .data-table thead th {
+    text-align: left;
+    padding: 8px 12px;
+    font-size: 10.5px;
+    font-weight: 500;
+    color: var(--ink-4);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    border-bottom: 1px solid var(--line);
+    font-family: 'DM Mono', monospace;
+  }
+  .data-table thead th.r { text-align: right; }
+  .data-table tbody td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--paper-3);
+    color: var(--ink-2);
+    vertical-align: middle;
+  }
+  .data-table tbody td.r { text-align: right; }
+  .data-table tbody tr:last-child td { border-bottom: none; }
+  .data-table tbody tr.row-hi td { background: var(--paper-2); }
+  .data-table tbody tr.row-hi td:first-child { color: var(--ink); font-weight: 500; }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 500;
+    padding: 2px 7px;
+    border-radius: 3px;
+    margin-left: 5px;
+    vertical-align: middle;
+  }
+  .badge-red { background: var(--accent-light); color: var(--accent); }
+  .badge-green { background: var(--green-light); color: var(--green); }
+  .badge-amber { background: var(--amber-light); color: var(--amber); }
+
+  .val-red { color: var(--accent); font-weight: 500; }
+  .val-green { color: var(--green); font-weight: 500; }
+  .val-amber { color: var(--amber); font-weight: 500; }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-left: 3px solid var(--line);
+    padding: .75rem 1rem .75rem 1.25rem;
+    margin: 1.5rem 0;
+    font-size: 13.5px;
+    line-height: 1.7;
+    color: var(--ink-2);
+    background: var(--paper-2);
+    border-radius: 0 6px 6px 0;
+  }
+  .callout strong { color: var(--ink); font-weight: 500; }
+  .callout.accent { border-left-color: var(--accent); background: var(--accent-light); }
+  .callout.green { border-left-color: var(--green); background: var(--green-light); }
+
+  /* ── COMPARISON CARDS ── */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin: 1.5rem 0;
+  }
+  @media (max-width: 600px) { .compare-grid { grid-template-columns: 1fr; } }
+  .compare-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    background: var(--paper);
+  }
+  .compare-card.highlight { border-color: var(--accent); background: var(--accent-light); }
+  .compare-card.highlight-green { border-color: var(--green); background: var(--green-light); }
+  .compare-head {
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    margin-bottom: .75rem;
+    font-family: 'DM Mono', monospace;
+    color: var(--ink-3);
+  }
+  .compare-head.red { color: var(--accent); }
+  .compare-head.green-h { color: var(--green); }
+  .compare-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(0,0,0,.06);
+    font-size: 13px;
+  }
+  .compare-item:last-child { border-bottom: none; }
+  .compare-item-label { color: var(--ink-3); }
+  .compare-item-val { font-weight: 500; color: var(--ink); font-family: 'DM Mono', monospace; font-size: 13px; }
+
+  /* ── RECOMMENDATION BOX ── */
+  .rec-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin: 2rem 0;
+  }
+  @media (max-width: 700px) { .rec-grid { grid-template-columns: 1fr; } }
+  .rec-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 1.5rem;
+    background: var(--paper);
+  }
+  .rec-num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2.5rem;
+    color: var(--line);
+    line-height: 1;
+    margin-bottom: .75rem;
+  }
+  .rec-title {
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: .5rem;
+    color: var(--ink);
+  }
+  .rec-body { font-size: 12.5px; color: var(--ink-3); line-height: 1.6; }
+
+  /* ── FOOTER ── */
+  footer {
+    background: var(--paper-2);
+    border-top: 1px solid var(--line);
+    padding: 2rem 3rem;
+    text-align: center;
+    font-size: 12px;
+    color: var(--ink-4);
+    font-family: 'DM Mono', monospace;
+    letter-spacing: .05em;
+  }
+
+  /* ── ANIMATION ── */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(16px);
+    transition: opacity .6s ease, transform .6s ease;
+  }
+  .fade-in.visible {
+    opacity: 1;
+    transform: none;
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="nav-brand">Poshmark · Seller Moderation</span>
+  <ul class="nav-links">
+    <li><a href="#context">Context</a></li>
+    <li><a href="#cancellation">Cancel Reasons</a></li>
+    <li><a href="#d30">D30 Behavior</a></li>
+    <li><a href="#recommendation">Recommendation</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<div class="hero fade-in">
+  <div class="hero-eyebrow">New seller cohort analysis · Feb 2026</div>
+  <h1>Non-reinstated sellers were <em>already disengaged</em> before moderation</h1>
+  <p class="hero-sub">Analysis in response to Angela's questions on whether soft restriction is losing high-potential sellers. Three data sets confirm the opposite: the cohort not reinstating was unlikely to generate meaningful order volume regardless of moderation.</p>
+  <div class="hero-meta">
+    <div class="hero-meta-item"><strong>45,039</strong>Total soft-restricted sellers</div>
+    <div class="hero-meta-item"><strong>5,062</strong>New user cohort</div>
+    <div class="hero-meta-item"><strong>22%</strong>New user reinstatement rate</div>
+    <div class="hero-meta-item"><strong>~5,000</strong>First-order cancels/week</div>
+  </div>
+</div>
+
+<!-- SECTION 1: CONTEXT -->
+<div class="section fade-in" id="context">
+  <div class="section-label">Context</div>
+  <div class="section-title">The overall funnel shows low reinstatement — and new users reinstate at half the platform average</div>
+  <p class="section-body">
+    Across 45,039 first-time soft-restricted sellers on the platform, <strong>48.7% moved to reinstate</strong>. But the new user cohort (5,062 sellers) reinstates at only <strong>22%</strong> — well below the platform average. The concern raised is whether the 74% who don't reinstate includes high-potential sellers being lost. The data says no.
+  </p>
+
+  <div class="stat-strip">
+    <div class="stat-cell">
+      <div class="stat-val">45,039</div>
+      <div class="stat-lbl">Total soft-restricted sellers (all time)</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val green">48.7%</div>
+      <div class="stat-lbl">Reinstated (all time)</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val red">22%</div>
+      <div class="stat-lbl">New user cohort reinstatement rate</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val red">74%</div>
+      <div class="stat-lbl">New users who did not reinstate</div>
+    </div>
+  </div>
+
+  <div class="chart-card-full">
+    <div class="chart-title">New user soft-restriction funnel (n = 5,062)</div>
+    <div class="funnel" id="funnel">
+      <div class="funnel-row">
+        <div class="funnel-label">Soft restricted</div>
+        <div class="funnel-bar-wrap"><div class="funnel-bar" style="background:#0f0f0f;width:0%" data-w="100%">5,062 sellers</div></div>
+        <div class="funnel-pct">100%</div>
+      </div>
+      <div class="funnel-row">
+        <div class="funnel-label">Self-reinstated</div>
+        <div class="funnel-bar-wrap"><div class="funnel-bar" style="background:#1a6b3a;width:0%" data-w="22%">1,119</div></div>
+        <div class="funnel-pct">22%</div>
+      </div>
+      <div class="funnel-row">
+        <div class="funnel-label">Did not reinstate</div>
+        <div class="funnel-bar-wrap"><div class="funnel-bar" style="background:#c8401a;width:0%" data-w="74%">3,769 sellers</div></div>
+        <div class="funnel-pct">74%</div>
+      </div>
+      <div class="funnel-row">
+        <div class="funnel-label">Escalated (hard restricted)</div>
+        <div class="funnel-bar-wrap"><div class="funnel-bar" style="background:#8a5a0d;width:0%" data-w="4%">174</div></div>
+        <div class="funnel-pct">4%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Key context:</strong> 50% of non-reinstated new users became sellers within 60 days of lister activation — the hypothesis is that fast lister-to-seller converters are being lost. The D30 behavior and cancellation reason data test this directly.
+  </div>
+</div>
+
+<!-- SECTION 2: CANCELLATION REASON -->
+<div class="section fade-in" id="cancellation">
+  <div class="section-label">Finding 01 — Angela's Q2</div>
+  <div class="section-title">Cancellation reason is the clearest signal of seller intent — and delayed_order dominates at 60%</div>
+  <p class="section-body">
+    Angela's hypothesis is validated. <strong>Delayed_order</strong> — a passive indicator of inactivity, where the seller simply didn't ship — accounts for 60.5% of soft-restricted new sellers and drives a 10.8% reinstatement rate. Sellers who actively managed their cancellation (item unavailable, changed mind, damaged item) reinstate at 4× the rate and return as active users at 99–100%. The non-moderated comparison cohort shows an identical 67% delayed_order share, confirming moderation is not catching a distinct seller type.
+  </p>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <div class="chart-title">Soft-restricted: cancellation reason mix</div>
+      <div class="chart-wrap">
+        <canvas id="reasonPie"></canvas>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Reinstatement rate by reason</div>
+      <div class="chart-wrap">
+        <canvas id="reinstateBar"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Cancellation reason</th>
+        <th class="r">Sellers</th>
+        <th class="r">Share of cohort</th>
+        <th class="r">Reinstatement rate</th>
+        <th class="r">D14 AU return</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-hi">
+        <td>delayed_order <span class="badge badge-red">passive</span></td>
+        <td class="r">3,062</td>
+        <td class="r">60.5%</td>
+        <td class="r val-red">10.8%</td>
+        <td class="r val-red">25%</td>
+      </tr>
+      <tr>
+        <td>seller_no_longer_has_item <span class="badge badge-green">active</span></td>
+        <td class="r">791</td>
+        <td class="r">15.6%</td>
+        <td class="r val-green">42.0%</td>
+        <td class="r val-green">99%</td>
+      </tr>
+      <tr>
+        <td>other <span class="badge badge-green">active</span></td>
+        <td class="r">381</td>
+        <td class="r">7.5%</td>
+        <td class="r val-green">51.4%</td>
+        <td class="r val-green">99%</td>
+      </tr>
+      <tr>
+        <td>damaged_item <span class="badge badge-green">active</span></td>
+        <td class="r">289</td>
+        <td class="r">5.7%</td>
+        <td class="r val-green">46.0%</td>
+        <td class="r val-green">100%</td>
+      </tr>
+      <tr>
+        <td>seller_changed_mind <span class="badge badge-green">active</span></td>
+        <td class="r">276</td>
+        <td class="r">5.5%</td>
+        <td class="r val-green">45.3%</td>
+        <td class="r val-green">99%</td>
+      </tr>
+      <tr>
+        <td>item_is_not_authentic <span class="badge badge-amber">flag</span></td>
+        <td class="r">263</td>
+        <td class="r">5.2%</td>
+        <td class="r val-red">1.1%</td>
+        <td class="r val-amber">85%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout accent">
+    <strong>item_is_not_authentic anomaly:</strong> 85% AU return rate but only 1.1% reinstatement suggests these users are re-engaging with the platform but hitting a policy-side block in the reinstatement flow — not disengagement. This segment warrants a separate flow audit.
+  </div>
+
+  <div class="chart-card-full">
+    <div class="chart-title">AU return rate by cancellation reason (post soft restriction)</div>
+    <div class="chart-wrap-tall">
+      <canvas id="auReturnBar"></canvas>
+    </div>
+  </div>
+
+  <div class="compare-grid">
+    <div class="compare-card highlight">
+      <div class="compare-head red">Passive — delayed_order (60.5%)</div>
+      <div class="compare-item"><span class="compare-item-label">Reinstatement rate</span><span class="compare-item-val" style="color:var(--accent)">10.8%</span></div>
+      <div class="compare-item"><span class="compare-item-label">D14 AU return</span><span class="compare-item-val" style="color:var(--accent)">25%</span></div>
+      <div class="compare-item"><span class="compare-item-label">Share of non-reinstated</span><span class="compare-item-val" style="color:var(--accent)">69%</span></div>
+      <div class="compare-item"><span class="compare-item-label">Non-mod cohort share</span><span class="compare-item-val">67.4%</span></div>
+    </div>
+    <div class="compare-card highlight-green">
+      <div class="compare-head green-h">Active reasons (seller-driven, 34%)</div>
+      <div class="compare-item"><span class="compare-item-label">Reinstatement rate</span><span class="compare-item-val" style="color:var(--green)">42–51%</span></div>
+      <div class="compare-item"><span class="compare-item-label">D14 AU return</span><span class="compare-item-val" style="color:var(--green)">99–100%</span></div>
+      <div class="compare-item"><span class="compare-item-label">Share of non-reinstated</span><span class="compare-item-val" style="color:var(--green)">24%</span></div>
+      <div class="compare-item"><span class="compare-item-label">Non-mod cohort share</span><span class="compare-item-val">24.7%</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3: D30 BEHAVIOR -->
+<div class="section fade-in" id="d30">
+  <div class="section-label">Finding 02 — Angela's Q1</div>
+  <div class="section-title">Only 16% receive another order in D30 — and 81% of those cancel again</div>
+  <p class="section-body">
+    The D30 cohort data answers Angela's question on pre-cancellation activity directly. Of new sellers who cancel their first order, <strong>only 1 in 6 receives another order within 30 days</strong>. Of those who do, 81% cancel again — 64% for seller-driven reasons. The delayed_order segment specifically has a 14% D30 reorder rate vs. 20% for active-cancel sellers, and subsequent cancellation rates of 76% vs. 47% respectively.
+  </p>
+
+  <div class="stat-strip">
+    <div class="stat-cell">
+      <div class="stat-val red">~5,000</div>
+      <div class="stat-lbl">First-order cancels per week (new sellers)</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val amber">16%</div>
+      <div class="stat-lbl">Get another order within D30</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val red">81%</div>
+      <div class="stat-lbl">Of those, cancel again in D30</div>
+    </div>
+    <div class="stat-cell">
+      <div class="stat-val red">64%</div>
+      <div class="stat-lbl">Of D30 cancels are seller-driven</div>
+    </div>
+  </div>
+
+  <div class="chart-card-full">
+    <div class="chart-title">D30 behavior: delayed_order vs. active-cancel sellers</div>
+    <div class="chart-wrap">
+      <canvas id="d30Chart"></canvas>
+    </div>
+  </div>
+
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Segment</th>
+        <th class="r">D30 reorder rate</th>
+        <th class="r">D60 reorder rate</th>
+        <th class="r">D30 order cancel rate</th>
+        <th class="r">D30 user cancel rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="row-hi">
+        <td>delayed_order</td>
+        <td class="r val-red">14%</td>
+        <td class="r">—</td>
+        <td class="r val-red">61%</td>
+        <td class="r val-red">76%</td>
+      </tr>
+      <tr>
+        <td>Other reasons (active cancel)</td>
+        <td class="r val-green">20%</td>
+        <td class="r">—</td>
+        <td class="r val-amber">28%</td>
+        <td class="r val-amber">47%</td>
+      </tr>
+      <tr class="row-hi">
+        <td>Overall cohort</td>
+        <td class="r">16%</td>
+        <td class="r">21%</td>
+        <td class="r">44%</td>
+        <td class="r">64%</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout">
+    <strong>Volume implication:</strong> At ~5,000 first-order cancels per week, ~800 sellers get a D30 reorder. With ~50% cancellation on those, the net non-cancelled order contribution is approximately <strong>400–500 orders/week</strong> from this cohort — limited scale impact, further supporting the rollout decision.
+  </div>
+
+  <div class="chart-card-full">
+    <div class="chart-title">Lister-to-seller conversion speed vs. AU return rate</div>
+    <div class="chart-wrap-tall">
+      <canvas id="daysChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4: RECOMMENDATION -->
+<div class="section fade-in" id="recommendation">
+  <div class="section-label">Assessment & Recommendation</div>
+  <div class="section-title">Proceed with 35% rollout — but use two distinct interventions, not one broadcast nudge</div>
+  <p class="section-body">
+    Ashika's conclusion to graduate the feature is supported by the data. The refinement: the reinstatement nudge strategy should be <strong>segmented by cancellation reason</strong>. A single undifferentiated email/push to all 74% non-reinstated sellers will spend the majority of effort on the lowest-intent group (delayed_order, ~61%) where marginal return is minimal.
+  </p>
+
+  <div class="callout green">
+    <strong>Data verdict:</strong> Non-reinstated sellers show low platform intent before moderation. The cohort not coming back would likely not have generated meaningful order volume regardless. The rollout is not losing good sellers at scale.
+  </div>
+
+  <div class="rec-grid">
+    <div class="rec-card">
+      <div class="rec-num">01</div>
+      <div class="rec-title">Active-cancel sellers (~18% of cohort)</div>
+      <div class="rec-body">seller_no_longer_has_item, seller_changed_mind, damaged_item. Reinstate at 42–51%. Friction is the barrier. Targeted email/push to the reinstatement flow will yield the highest lift. Prioritise this segment first.</div>
+    </div>
+    <div class="rec-card">
+      <div class="rec-num">02</div>
+      <div class="rec-title">delayed_order sellers (~61% of cohort)</div>
+      <div class="rec-body">Reinstate at 11%. Genuinely low intent. A reinstatement nudge underperforms here. The higher-leverage intervention is upstream: shipping expectation education before the first cancellation, reducing how many enter this bucket.</div>
+    </div>
+    <div class="rec-card">
+      <div class="rec-num">03</div>
+      <div class="rec-title">item_is_not_authentic (~5%)</div>
+      <div class="rec-body">85% AU return, 1.1% reinstatement. These users are engaging but policy-blocked. Treat separately from the main cohort — a manual review or dedicated reinstatement path may be warranted before any comms.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Data as of Feb 6, 2026 &nbsp;·&nbsp; Sources: 45,039 soft-restricted sellers (all time), 5,062 new-user cohort, 3,213 non-moderated first-order cancellers &nbsp;·&nbsp; Prepared for Angela Buckmaster
+</footer>
+
+<script>
+  // ── INTERSECTION OBSERVER for fade-in ──
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.fade-in').forEach(el => obs.observe(el));
+
+  // ── FUNNEL ANIMATION ──
+  setTimeout(() => {
+    document.querySelectorAll('.funnel-bar').forEach(bar => {
+      bar.style.width = bar.dataset.w;
+    });
+  }, 400);
+
+  // ── CHART DEFAULTS ──
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = '#717171';
+
+  const C_RED    = '#c8401a';
+  const C_GREEN  = '#1a6b3a';
+  const C_AMBER  = '#8a5a0d';
+  const C_BLUE   = '#1a5c8a';
+  const C_GRAY   = '#aaaaaa';
+  const C_RED_L  = 'rgba(200,64,26,.12)';
+  const C_GRN_L  = 'rgba(26,107,58,.12)';
+
+  // ── REASON PIE ──
+  new Chart(document.getElementById('reasonPie'), {
+    type: 'doughnut',
+    data: {
+      labels: ['delayed_order', 'seller_no_longer_has_item', 'other', 'damaged_item', 'seller_changed_mind', 'item_is_not_authentic'],
+      datasets: [{
+        data: [60.5, 15.6, 7.5, 5.7, 5.5, 5.2],
+        backgroundColor: [C_RED, C_GREEN, '#555', C_GREEN, C_GREEN, C_AMBER],
+        borderWidth: 2,
+        borderColor: '#faf9f6',
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { boxWidth: 10, padding: 10, font: { size: 11 } }
+        },
+        tooltip: {
+          callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw}%` }
+        }
+      }
+    }
+  });
+
+  // ── REINSTATE BAR ──
+  new Chart(document.getElementById('reinstateBar'), {
+    type: 'bar',
+    data: {
+      labels: ['delayed_order', 'seller_no_longer\n_has_item', 'damaged_item', 'seller_changed\n_mind', 'other', 'item_is_not\n_authentic'],
+      datasets: [{
+        label: 'Reinstatement rate %',
+        data: [10.8, 42.0, 46.0, 45.3, 51.4, 1.1],
+        backgroundColor: [C_RED, C_GREEN, C_GREEN, C_GREEN, C_GREEN, C_AMBER],
+        borderRadius: 3,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw}% reinstatement rate` } }
+      },
+      scales: {
+        x: {
+          max: 60,
+          grid: { color: 'rgba(0,0,0,.06)' },
+          ticks: { callback: v => v + '%' }
+        },
+        y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  // ── AU RETURN BAR ──
+  new Chart(document.getElementById('auReturnBar'), {
+    type: 'bar',
+    data: {
+      labels: ['delayed_order', 'seller_no_longer_has_item', 'item_is_not_authentic', 'seller_changed_mind', 'damaged_item', 'other'],
+      datasets: [{
+        label: 'AU return rate %',
+        data: [25.1, 99.1, 85.3, 99.3, 100, 99.4],
+        backgroundColor: [C_RED, C_GREEN, C_AMBER, C_GREEN, C_GREEN, C_GREEN],
+        borderRadius: 4,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw}% AU return rate` } }
+      },
+      scales: {
+        y: {
+          max: 110,
+          grid: { color: 'rgba(0,0,0,.06)' },
+          ticks: { callback: v => v + '%' }
+        },
+        x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  // ── D30 GROUPED BAR ──
+  new Chart(document.getElementById('d30Chart'), {
+    type: 'bar',
+    data: {
+      labels: ['D30 reorder rate', 'D30 seller cancel rate', 'D30 any cancel rate'],
+      datasets: [
+        {
+          label: 'delayed_order (passive)',
+          data: [14, 61, 76],
+          backgroundColor: C_RED,
+          borderRadius: 3,
+          borderSkipped: false
+        },
+        {
+          label: 'Other reasons (active cancel)',
+          data: [20, 28, 47],
+          backgroundColor: C_GREEN,
+          borderRadius: 3,
+          borderSkipped: false
+        },
+        {
+          label: 'Overall cohort',
+          data: [16, 44, 64],
+          backgroundColor: '#888',
+          borderRadius: 3,
+          borderSkipped: false
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}%` } }
+      },
+      scales: {
+        y: {
+          max: 90,
+          grid: { color: 'rgba(0,0,0,.06)' },
+          ticks: { callback: v => v + '%' }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+
+  // ── DAYS CHART ──
+  new Chart(document.getElementById('daysChart'), {
+    type: 'bar',
+    data: {
+      labels: ['<D7', 'D7–D14', 'D14–D30', 'D30–D60', 'D60–D90', 'D90–D180', 'D180+'],
+      datasets: [
+        {
+          label: 'Sellers in tier',
+          data: [870, 244, 348, 404, 247, 300, 1385],
+          backgroundColor: 'rgba(26,92,138,.18)',
+          borderColor: C_BLUE,
+          borderWidth: 1,
+          borderRadius: 3,
+          yAxisID: 'y',
+          type: 'bar'
+        },
+        {
+          label: 'AU return rate %',
+          data: [57.7, 55.3, 45.7, 38.4, 41.7, 43.7, 43.6],
+          borderColor: C_RED,
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          pointBackgroundColor: C_RED,
+          pointRadius: 5,
+          tension: .3,
+          yAxisID: 'y2',
+          type: 'line'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { boxWidth: 12, padding: 14, font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => ctx.dataset.yAxisID === 'y2'
+              ? ` AU return: ${ctx.raw}%`
+              : ` Sellers: ${ctx.raw.toLocaleString()}`
+          }
+        }
+      },
+      scales: {
+        y: {
+          position: 'left',
+          grid: { color: 'rgba(0,0,0,.06)' },
+          title: { display: true, text: 'Sellers in tier', font: { size: 11 } }
+        },
+        y2: {
+          position: 'right',
+          max: 80,
+          grid: { display: false },
+          ticks: { callback: v => v + '%' },
+          title: { display: true, text: 'AU return rate', font: { size: 11 } }
+        },
+        x: { grid: { display: false } }
+      }
+    }
+  });
+</script>
+</body>
+</html>
